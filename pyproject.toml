@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "bitcoin-dataset-kaggle-auto-updater"
+version = "0.1.0"
+description = "Automatically update Bitcoin datasets on Kaggle with Binance data."
+authors = ["Novandra Anugrah <youremail@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pandas = "^2.2.2"
+requests = "^2.32.3"
+kaggle = "^1.6.17"
+python-binance = "^1.0.27"
+python-dotenv = "^1.0.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
