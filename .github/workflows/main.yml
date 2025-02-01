@@ -1,0 +1,35 @@
+name: Update Bitcoin Dataset
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # Runs at 00:00 UTC every day
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Create .env file
+        run: |
+          echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> .env
+          echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> .env
+          echo "BINANCE_API_KEY=${{ secrets.BINANCE_API_KEY }}" >> .env
+          echo "BINANCE_API_SECRET=${{ secrets.BINANCE_API_SECRET }}" >> .env
+
+      - name: Run updater script
+        run: poetry run python bitcoin_dataset_kaggle_auto_updater/kaggle_update_bitcoin.py
