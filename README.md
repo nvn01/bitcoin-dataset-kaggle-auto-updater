@@ -3,6 +3,7 @@
 The project includes a GitHub Actions workflow that:
 
 - Runs automatically everyday at midnight (UTC)
+- Updates the Kaggle dataset at https://www.kaggle.com/datasets/novandraanugrah/bitcoin-historical-datasets-2018-2024
 
 ## Dataset Structure
 
@@ -26,12 +27,6 @@ Each file contains the following columns:
 - Number of trades
 - Taker buy base asset volume
 - Taker buy quote asset volume
-
-## Automated Daily Updates
-
-This dataset is automatically updated every day using a custom Python program.  
-The source code for the update script is available on GitHub:  
-🔗 [Bitcoin Dataset Kaggle Auto Updater](https://github.com/nvn01/bitcoin-dataset-kaggle-auto-updater)
 
 ## License
 
