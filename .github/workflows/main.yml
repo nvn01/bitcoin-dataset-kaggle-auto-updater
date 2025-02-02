@@ -23,8 +23,22 @@ jobs:
       - name: Install Poetry
         run: pip install poetry
 
+      - name: Update Poetry lock file
+        run: poetry lock
+
       - name: Install project dependencies
         run: poetry install
+
+      - name: Setup Proxy
+        run: |
+          echo "Setting up proxy configuration..."
+          sudo apt-get update
+          sudo apt-get install -y tor privoxy
+          sudo cp /etc/privoxy/config /etc/privoxy/config.backup
+          echo 'forward-socks5 / 127.0.0.1:9050 .' | sudo tee -a /etc/privoxy/config
+          sudo service tor start
+          sudo service privoxy start
+          sleep 10  # Wait for services to start
 
       - name: Run the dataset update script
         env:
@@ -32,5 +46,7 @@ jobs:
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
           BINANCE_API_KEY: ${{ secrets.BINANCE_API_KEY }}
           BINANCE_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
+          HTTP_PROXY: "http://127.0.0.1:8118"
+          HTTPS_PROXY: "http://127.0.0.1:8118"
         run: |
           poetry run python bitcoin_dataset_kaggle_auto_updater/kaggle_update_bitcoin.py
