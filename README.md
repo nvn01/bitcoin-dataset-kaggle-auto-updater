@@ -2,19 +2,7 @@
 
 The project includes a GitHub Actions workflow that:
 
-- Runs automatically every Sunday at midnight (UTC)
-- Can be triggered manually from the Actions tab
-- Uses Tor proxy to handle API restrictions
-
-To use GitHub Actions:
-
-1. Add your credentials as repository secrets:
-   - `KAGGLE_USERNAME`
-   - `KAGGLE_KEY`
-   - `BINANCE_API_KEY`
-   - `BINANCE_API_SECRET`
-2. Enable Actions in your repository
-3. The workflow will run automatically according to schedule
+- Runs automatically everyday at midnight (UTC)
 
 ## Dataset Structure
 
@@ -38,14 +26,6 @@ Each file contains the following columns:
 - Number of trades
 - Taker buy base asset volume
 - Taker buy quote asset volume
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## License
 
