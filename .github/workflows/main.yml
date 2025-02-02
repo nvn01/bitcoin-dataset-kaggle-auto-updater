@@ -30,9 +30,12 @@ jobs:
         run: |
           echo "Setting up proxy configuration..."
           sudo apt-get update
-          sudo apt-get install -y tor
+          sudo apt-get install -y tor privoxy
+          sudo cp /etc/privoxy/config /etc/privoxy/config.backup
+          echo 'forward-socks5 / 127.0.0.1:9050 .' | sudo tee -a /etc/privoxy/config
           sudo service tor start
-          sleep 10  # Wait for Tor to start
+          sudo service privoxy start
+          sleep 10  # Wait for services to start
 
       - name: Run the dataset update script
         env:
@@ -40,7 +43,7 @@ jobs:
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
           BINANCE_API_KEY: ${{ secrets.BINANCE_API_KEY }}
           BINANCE_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
-          HTTP_PROXY: "socks5h://127.0.0.1:9050"
-          HTTPS_PROXY: "socks5h://127.0.0.1:9050"
+          HTTP_PROXY: "http://127.0.0.1:8118"
+          HTTPS_PROXY: "http://127.0.0.1:8118"
         run: |
           poetry run python bitcoin_dataset_kaggle_auto_updater/kaggle_update_bitcoin.py

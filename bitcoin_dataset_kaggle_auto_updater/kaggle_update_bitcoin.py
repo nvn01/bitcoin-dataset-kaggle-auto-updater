@@ -13,8 +13,18 @@ KAGGLE_KEY = os.getenv("KAGGLE_KEY")
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
 BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
 
-# Initialize Binance client
-client = Client(BINANCE_API_KEY, BINANCE_API_SECRET)
+# Configure proxy settings
+proxies = {
+    'http': os.getenv('HTTP_PROXY'),
+    'https': os.getenv('HTTPS_PROXY')
+}
+
+# Initialize Binance client with proxy settings
+client = Client(
+    BINANCE_API_KEY, 
+    BINANCE_API_SECRET,
+    {'proxies': proxies}
+)
 
 # Base directory of the script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
