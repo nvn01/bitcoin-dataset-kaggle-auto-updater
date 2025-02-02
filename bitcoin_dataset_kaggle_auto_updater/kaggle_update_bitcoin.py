@@ -4,6 +4,7 @@ from datetime import datetime
 from binance.client import Client
 from dotenv import load_dotenv
 from kaggle.api.kaggle_api_extended import KaggleApi
+import time
 
 # Load environment variables
 load_dotenv()
@@ -19,12 +20,41 @@ proxies = {
     'https': os.getenv('HTTPS_PROXY')
 }
 
-# Initialize Binance client with proxy settings
-client = Client(
-    BINANCE_API_KEY, 
-    BINANCE_API_SECRET,
-    {'proxies': proxies}
-)
+def create_binance_client(max_retries=3):
+    """Create Binance client with retry logic."""
+    proxies = {
+        'http': os.getenv('HTTP_PROXY'),
+        'https': os.getenv('HTTPS_PROXY')
+    }
+    
+    for attempt in range(max_retries):
+        try:
+            client = Client(
+                BINANCE_API_KEY, 
+                BINANCE_API_SECRET,
+                {
+                    'proxies': proxies,
+                    'timeout': 30,
+                    'verify': True
+                }
+            )
+            # Test the connection
+            client.ping()
+            print("Successfully connected to Binance API")
+            return client
+        except Exception as e:
+            print(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                print("Waiting 10 seconds before retry...")
+                time.sleep(10)
+                # Restart Tor service to get a new IP
+                os.system('sudo service tor restart')
+                time.sleep(5)
+            else:
+                raise
+
+# Replace the existing client initialization with:
+client = create_binance_client()
 
 # Base directory of the script
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -47,36 +77,33 @@ def download_kaggle_dataset(dataset_slug, output_dir):
     api.dataset_metadata(dataset_slug, path=output_dir)
     print(f"Dataset and metadata downloaded to {output_dir}")
 
-def fetch_binance_data(symbol, interval, start_date, end_date, output_file):
-    """Fetch historical data from Binance."""
-    # Configure proxy settings
-    proxies = {
-        'http': os.getenv('HTTP_PROXY'),
-        'https': os.getenv('HTTPS_PROXY')
-    }
-    
-    # Initialize client with proxy settings
-    client = Client(
-        BINANCE_API_KEY, 
-        BINANCE_API_SECRET,
-        {'proxies': proxies}
-    )
-    
-    try:
-        klines = client.get_historical_klines(symbol, interval, start_date, end_date)
-        columns = [
-            'Open time', 'Open', 'High', 'Low', 'Close', 'Volume',
-            'Close time', 'Quote asset volume', 'Number of trades',
-            'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'
-        ]
-        df = pd.DataFrame(klines, columns=columns)
-        df['Open time'] = pd.to_datetime(df['Open time'], unit='ms')
-        df['Close time'] = pd.to_datetime(df['Close time'], unit='ms')
-        df.to_csv(output_file, index=False)
-        print(f"Fetched data saved to {output_file}")
-    except Exception as e:
-        print(f"Error fetching data: {str(e)}")
-        raise
+def fetch_binance_data(symbol, interval, start_date, end_date, output_file, max_retries=3):
+    """Fetch historical data from Binance with retry logic."""
+    for attempt in range(max_retries):
+        try:
+            client = create_binance_client()
+            klines = client.get_historical_klines(symbol, interval, start_date, end_date)
+            columns = [
+                'Open time', 'Open', 'High', 'Low', 'Close', 'Volume',
+                'Close time', 'Quote asset volume', 'Number of trades',
+                'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'
+            ]
+            df = pd.DataFrame(klines, columns=columns)
+            df['Open time'] = pd.to_datetime(df['Open time'], unit='ms')
+            df['Close time'] = pd.to_datetime(df['Close time'], unit='ms')
+            df.to_csv(output_file, index=False)
+            print(f"Fetched data saved to {output_file}")
+            return
+        except Exception as e:
+            print(f"Attempt {attempt + 1}/{max_retries} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                print("Waiting 20 seconds before retry...")
+                time.sleep(20)
+                # Restart Tor service to get a new IP
+                os.system('sudo service tor restart')
+                time.sleep(5)
+            else:
+                raise
 
 def merge_datasets(existing_file, new_file, output_file):
     """Merge existing and new datasets."""
