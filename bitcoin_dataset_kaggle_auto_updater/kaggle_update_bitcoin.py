@@ -39,17 +39,34 @@ def download_kaggle_dataset(dataset_slug, output_dir):
 
 def fetch_binance_data(symbol, interval, start_date, end_date, output_file):
     """Fetch historical data from Binance."""
-    klines = client.get_historical_klines(symbol, interval, start_date, end_date)
-    columns = [
-        'Open time', 'Open', 'High', 'Low', 'Close', 'Volume',
-        'Close time', 'Quote asset volume', 'Number of trades',
-        'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'
-    ]
-    df = pd.DataFrame(klines, columns=columns)
-    df['Open time'] = pd.to_datetime(df['Open time'], unit='ms')
-    df['Close time'] = pd.to_datetime(df['Close time'], unit='ms')
-    df.to_csv(output_file, index=False)
-    print(f"Fetched data saved to {output_file}")
+    # Configure proxy settings
+    proxies = {
+        'http': os.getenv('HTTP_PROXY'),
+        'https': os.getenv('HTTPS_PROXY')
+    }
+    
+    # Initialize client with proxy settings
+    client = Client(
+        BINANCE_API_KEY, 
+        BINANCE_API_SECRET,
+        {'proxies': proxies}
+    )
+    
+    try:
+        klines = client.get_historical_klines(symbol, interval, start_date, end_date)
+        columns = [
+            'Open time', 'Open', 'High', 'Low', 'Close', 'Volume',
+            'Close time', 'Quote asset volume', 'Number of trades',
+            'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'
+        ]
+        df = pd.DataFrame(klines, columns=columns)
+        df['Open time'] = pd.to_datetime(df['Open time'], unit='ms')
+        df['Close time'] = pd.to_datetime(df['Close time'], unit='ms')
+        df.to_csv(output_file, index=False)
+        print(f"Fetched data saved to {output_file}")
+    except Exception as e:
+        print(f"Error fetching data: {str(e)}")
+        raise
 
 def merge_datasets(existing_file, new_file, output_file):
     """Merge existing and new datasets."""

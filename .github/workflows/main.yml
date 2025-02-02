@@ -26,11 +26,21 @@ jobs:
       - name: Install project dependencies
         run: poetry install
 
+      - name: Setup Proxy
+        run: |
+          echo "Setting up proxy configuration..."
+          sudo apt-get update
+          sudo apt-get install -y tor
+          sudo service tor start
+          sleep 10  # Wait for Tor to start
+
       - name: Run the dataset update script
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
           BINANCE_API_KEY: ${{ secrets.BINANCE_API_KEY }}
           BINANCE_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
+          HTTP_PROXY: "socks5h://127.0.0.1:9050"
+          HTTPS_PROXY: "socks5h://127.0.0.1:9050"
         run: |
           poetry run python bitcoin_dataset_kaggle_auto_updater/kaggle_update_bitcoin.py
