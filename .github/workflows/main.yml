@@ -1,41 +1,36 @@
-name: Update Bitcoin Dataset
+name: Update Kaggle Bitcoin Dataset
 
 on:
+  # Run every Sunday at midnight (UTC) — adjust as needed
   schedule:
-    - cron: "0 0 * * *" # Runs at 00:00 UTC every day
-  workflow_dispatch: # Allows manual trigger
+    - cron: "0 0 * * 0"
+  # Allows you to manually trigger the workflow in GitHub's "Actions" tab
+  workflow_dispatch:
 
 jobs:
-  update:
+  update-dataset:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.10" # Or whichever version you need
 
       - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
+        run: pip install poetry
 
-      - name: Install dependencies
+      - name: Install project dependencies
         run: poetry install
 
-      - name: Setup Kaggle credentials
+      - name: Run the dataset update script
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          BINANCE_API_KEY: ${{ secrets.BINANCE_API_KEY }}
+          BINANCE_API_SECRET: ${{ secrets.BINANCE_API_SECRET }}
         run: |
-          mkdir -p ~/.config/kaggle
-          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\",\"key\":\"${{ secrets.KAGGLE_KEY }}\"}" > ~/.config/kaggle/kaggle.json
-          chmod 600 ~/.config/kaggle/kaggle.json
-
-      - name: Create .env file
-        run: |
-          echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> .env
-          echo "KAGGLE_KEY=${{ secrets.KAGGLE_KEY }}" >> .env
-          echo "BINANCE_API_KEY=${{ secrets.BINANCE_API_KEY }}" >> .env
-          echo "BINANCE_API_SECRET=${{ secrets.BINANCE_API_SECRET }}" >> .env
-
-      - name: Run updater script
-        run: poetry run python bitcoin_dataset_kaggle_auto_updater/kaggle_update_bitcoin.py
+          poetry run python bitcoin_dataset_kaggle_auto_updater/kaggle_update_bitcoin.py
