@@ -165,7 +165,8 @@ def main():
         merge_datasets(old_file, new_file, merged_file)
 
     # Step 5: Upload updated datasets to Kaggle
-    upload_to_kaggle(DATA_FOLDER, dataset_slug, "Updated with latest data from Binance.")
+    current_date = datetime.now().strftime("%B, %d %Y")
+    upload_to_kaggle(DATA_FOLDER, dataset_slug, f"Update {current_date}")
 
 if __name__ == "__main__":
     main()
