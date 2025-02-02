@@ -27,6 +27,12 @@ Each file contains the following columns:
 - Taker buy base asset volume
 - Taker buy quote asset volume
 
+## Automated Daily Updates
+
+This dataset is automatically updated every day using a custom Python program.  
+The source code for the update script is available on GitHub:  
+🔗 [Bitcoin Dataset Kaggle Auto Updater](https://github.com/nvn01/bitcoin-dataset-kaggle-auto-updater)
+
 ## License
 
 This project is licensed under the CC0-1.0 License - see the dataset-metadata.json file for details.
