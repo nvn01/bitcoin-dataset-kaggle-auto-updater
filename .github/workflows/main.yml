@@ -24,6 +24,12 @@ jobs:
       - name: Install dependencies
         run: poetry install
 
+      - name: Setup Kaggle credentials
+        run: |
+          mkdir -p ~/.config/kaggle
+          echo "{\"username\":\"${{ secrets.KAGGLE_USERNAME }}\",\"key\":\"${{ secrets.KAGGLE_KEY }}\"}" > ~/.config/kaggle/kaggle.json
+          chmod 600 ~/.config/kaggle/kaggle.json
+
       - name: Create .env file
         run: |
           echo "KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}" >> .env
