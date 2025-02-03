@@ -34,11 +34,16 @@ jobs:
           echo "Setting up proxy configuration..."
           sudo apt-get update
           sudo apt-get install -y tor privoxy
-          sudo cp /etc/privoxy/config /etc/privoxy/config.backup
-          echo 'forward-socks5 / 127.0.0.1:9050 .' | sudo tee -a /etc/privoxy/config
+          sudo bash -c 'cat >> /etc/privoxy/config << EOL
+          forward-socks5 / 127.0.0.1:9050 .
+          max-client-connections 256
+          keep-alive-timeout 5
+          socket-timeout 300
+          EOL'
           sudo service tor start
           sudo service privoxy start
-          sleep 10  # Wait for services to start
+          curl --proxy http://127.0.0.1:8118 https://api.ipify.org || true
+          sleep 15  # Give more time for services to stabilize
 
       - name: Run the dataset update script
         env:
