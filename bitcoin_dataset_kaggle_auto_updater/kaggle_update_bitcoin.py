@@ -1,10 +1,11 @@
 import os
+import sys
+import time
 import pandas as pd
 from datetime import datetime
 from binance.client import Client
 from dotenv import load_dotenv
 from kaggle.api.kaggle_api_extended import KaggleApi
-import time
 
 # Load environment variables
 load_dotenv()
@@ -53,7 +54,7 @@ def create_binance_client(max_retries=3):
             else:
                 raise
 
-# Replace the existing client initialization with:
+# Initialize Binance client
 client = create_binance_client()
 
 # Base directory of the script
@@ -125,10 +126,10 @@ def upload_to_kaggle(output_dir, dataset_slug, version_notes):
     api = KaggleApi()
     api.authenticate()
     api.dataset_create_version(
-    folder=output_dir,      # Or path=output_dir
-    version_notes=version_notes,
-    dir_mode=True
-)
+        folder=output_dir,  # Or path=output_dir
+        version_notes=version_notes,
+        dir_mode=True
+    )
     print("Dataset updated on Kaggle.")
 
 def main():
@@ -169,4 +170,17 @@ def main():
     upload_to_kaggle(DATA_FOLDER, dataset_slug, f"Update {current_date}")
 
 if __name__ == "__main__":
-    main()
+    max_attempts = 10  # Maximum number of global attempts
+    attempt = 0
+    while attempt < max_attempts:
+        try:
+            main()
+            break  # Exit loop if main() succeeds
+        except Exception as e:
+            attempt += 1
+            print(f"Global attempt {attempt}/{max_attempts} failed: {e}")
+            print("Retrying in 60 seconds...")
+            time.sleep(60)
+    else:
+        print("Max attempts reached. Exiting.")
+        sys.exit(1)

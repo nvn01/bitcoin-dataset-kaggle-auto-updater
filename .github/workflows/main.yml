@@ -1,10 +1,10 @@
 name: Update Kaggle Bitcoin Dataset
 
 on:
-  # Run every Sunday at midnight (UTC) — adjust as needed
+  # Run every day at midnight (UTC) — adjust the schedule as needed
   schedule:
     - cron: "0 0 * * *"
-  # Allows you to manually trigger the workflow in GitHub's "Actions" tab
+  # Allows manual triggering via the "Actions" tab
   workflow_dispatch:
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10" # Or whichever version you need
+          python-version: "3.10" # Or your required version
 
       - name: Install Poetry
         run: pip install poetry
@@ -43,9 +43,9 @@ jobs:
           sudo service tor start
           sudo service privoxy start
           curl --proxy http://127.0.0.1:8118 https://api.ipify.org || true
-          sleep 15  # Give more time for services to stabilize
+          sleep 15  # Allow services to stabilize
 
-      - name: Run the dataset update script
+      - name: Run the dataset update script with retries
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
@@ -54,4 +54,7 @@ jobs:
           HTTP_PROXY: "http://127.0.0.1:8118"
           HTTPS_PROXY: "http://127.0.0.1:8118"
         run: |
-          poetry run python bitcoin_dataset_kaggle_auto_updater/kaggle_update_bitcoin.py
+          until poetry run python bitcoin_dataset_kaggle_auto_updater/kaggle_update_bitcoin.py; do
+            echo "Dataset update failed, retrying in 60 seconds..."
+            sleep 60
+          done
