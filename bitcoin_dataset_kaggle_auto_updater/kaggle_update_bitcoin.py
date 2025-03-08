@@ -1,5 +1,5 @@
 import os
-# Disable resumable uploads in Kaggle API (helps in CI environments like GitHub Actions)
+# Disable resumable uploads (helpful in CI environments)
 os.environ["KAGGLE_API_NO_RESUME"] = "True"
 
 import sys
@@ -19,7 +19,7 @@ KAGGLE_KEY = os.getenv("KAGGLE_KEY")
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
 BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
 
-# Configure proxy settings
+# Configure proxy settings (will be used for Binance API calls)
 proxies = {
     'http': os.getenv('HTTP_PROXY'),
     'https': os.getenv('HTTPS_PROXY')
@@ -27,7 +27,7 @@ proxies = {
 
 def create_binance_client(max_retries=3):
     """Create Binance client with retry logic."""
-    proxies = {
+    local_proxies = {
         'http': os.getenv('HTTP_PROXY'),
         'https': os.getenv('HTTPS_PROXY')
     }
@@ -38,7 +38,7 @@ def create_binance_client(max_retries=3):
                 BINANCE_API_KEY, 
                 BINANCE_API_SECRET,
                 {
-                    'proxies': proxies,
+                    'proxies': local_proxies,
                     'timeout': 30,
                     'verify': True
                 }
@@ -134,15 +134,25 @@ def copy_metadata(src_folder, dest_folder):
         print(f"Metadata file not found in {src_folder}")
 
 def upload_to_kaggle(upload_folder, dataset_slug, version_notes):
-    """Upload the updated dataset to Kaggle."""
-    api = KaggleApi()
-    api.authenticate()
-    api.dataset_create_version(
-        folder=upload_folder,
-        version_notes=version_notes,
-        dir_mode=True
-    )
-    print("Dataset updated on Kaggle.")
+    """Upload the updated dataset to Kaggle without using the proxy."""
+    # Temporarily remove proxy settings for Kaggle upload
+    original_http_proxy = os.environ.pop("HTTP_PROXY", None)
+    original_https_proxy = os.environ.pop("HTTPS_PROXY", None)
+    try:
+        api = KaggleApi()
+        api.authenticate()
+        api.dataset_create_version(
+            folder=upload_folder,
+            version_notes=version_notes,
+            dir_mode=True
+        )
+        print("Dataset updated on Kaggle.")
+    finally:
+        # Restore proxy settings after upload
+        if original_http_proxy:
+            os.environ["HTTP_PROXY"] = original_http_proxy
+        if original_https_proxy:
+            os.environ["HTTPS_PROXY"] = original_https_proxy
 
 def main():
     dataset_slug = "novandraanugrah/bitcoin-historical-datasets-2018-2024"
