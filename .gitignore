@@ -1,6 +1,7 @@
 # Data folders
 new_data/
 data/
+merged_data/
 
 # Environment variables
 .env
