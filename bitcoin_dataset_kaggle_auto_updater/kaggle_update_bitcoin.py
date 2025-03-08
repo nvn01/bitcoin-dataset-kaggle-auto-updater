@@ -61,6 +61,7 @@ client = create_binance_client()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FOLDER = os.path.join(BASE_DIR, "data")
 NEW_DATA_FOLDER = os.path.join(BASE_DIR, "new_data")
+MERGED_FOLDER = os.path.join(BASE_DIR, "merged_data")  # New folder for merged files
 
 def clean_folder(folder_path):
     """Clean the specified folder."""
@@ -100,7 +101,6 @@ def fetch_binance_data(symbol, interval, start_date, end_date, output_file, max_
             if attempt < max_retries - 1:
                 print("Waiting 20 seconds before retry...")
                 time.sleep(20)
-                # Restart Tor service to get a new IP
                 os.system('sudo service tor restart')
                 time.sleep(5)
             else:
@@ -111,7 +111,7 @@ def merge_datasets(existing_file, new_file, output_file):
     existing_data = pd.read_csv(existing_file)
     new_data = pd.read_csv(new_file)
 
-    # Ensure Open time and Close time are datetime
+    # Ensure Open time is datetime
     existing_data['Open time'] = pd.to_datetime(existing_data['Open time'])
     new_data['Open time'] = pd.to_datetime(new_data['Open time'])
 
@@ -121,12 +121,12 @@ def merge_datasets(existing_file, new_file, output_file):
     merged_data.to_csv(output_file, index=False)
     print(f"Merged dataset saved to {output_file}")
 
-def upload_to_kaggle(output_dir, dataset_slug, version_notes):
+def upload_to_kaggle(upload_folder, dataset_slug, version_notes):
     """Upload the updated dataset to Kaggle."""
     api = KaggleApi()
     api.authenticate()
     api.dataset_create_version(
-        folder=output_dir,  # Or path=output_dir
+        folder=upload_folder,
         version_notes=version_notes,
         dir_mode=True
     )
@@ -136,12 +136,14 @@ def main():
     dataset_slug = "novandraanugrah/bitcoin-historical-datasets-2018-2024"
     os.makedirs(DATA_FOLDER, exist_ok=True)
     os.makedirs(NEW_DATA_FOLDER, exist_ok=True)
+    os.makedirs(MERGED_FOLDER, exist_ok=True)
 
-    # Step 1: Clean folders
+    # Step 1: Clean folders (do not wait to clean merged_data until after successful upload)
     clean_folder(DATA_FOLDER)
     clean_folder(NEW_DATA_FOLDER)
+    clean_folder(MERGED_FOLDER)
 
-    # Step 2: Download Kaggle dataset and metadata
+    # Step 2: Download Kaggle dataset and metadata into DATA_FOLDER
     download_kaggle_dataset(dataset_slug, DATA_FOLDER)
 
     # Step 3: Fetch new data for all timeframes
@@ -158,16 +160,28 @@ def main():
         output_file = os.path.join(NEW_DATA_FOLDER, f"{tf_name}.csv")
         fetch_binance_data("BTCUSDT", tf_interval, start_date, end_date, output_file)
 
-    # Step 4: Merge new data with old datasets
+    # Step 4: Merge new data with old datasets and save the merged files in MERGED_FOLDER
     for tf_name, _ in timeframes.items():
         old_file = os.path.join(DATA_FOLDER, f"btc_{tf_name}_data_2018_to_2025.csv")
         new_file = os.path.join(NEW_DATA_FOLDER, f"{tf_name}.csv")
-        merged_file = old_file  # Output file matches the original Kaggle dataset
+        merged_file = os.path.join(MERGED_FOLDER, f"btc_{tf_name}_data_2018_to_2025.csv")
         merge_datasets(old_file, new_file, merged_file)
 
-    # Step 5: Upload updated datasets to Kaggle
+    # Step 5: Upload updated datasets from MERGED_FOLDER with retry loop until all files upload
     current_date = datetime.now().strftime("%B, %d %Y")
-    upload_to_kaggle(DATA_FOLDER, dataset_slug, f"Update {current_date}")
+    upload_successful = False
+    while not upload_successful:
+        try:
+            upload_to_kaggle(MERGED_FOLDER, dataset_slug, f"Update {current_date}")
+            upload_successful = True
+        except Exception as e:
+            print(f"Upload failed: {e}. Retrying in 60 seconds...")
+            time.sleep(60)
+
+    # Step 6: Once upload is successful, clean all folders
+    clean_folder(DATA_FOLDER)
+    clean_folder(NEW_DATA_FOLDER)
+    clean_folder(MERGED_FOLDER)
 
 if __name__ == "__main__":
     max_attempts = 10  # Maximum number of global attempts
