@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import shutil
 import pandas as pd
 from datetime import datetime
 from binance.client import Client
@@ -48,7 +49,6 @@ def create_binance_client(max_retries=3):
             if attempt < max_retries - 1:
                 print("Waiting 10 seconds before retry...")
                 time.sleep(10)
-                # Restart Tor service to get a new IP
                 os.system('sudo service tor restart')
                 time.sleep(5)
             else:
@@ -121,6 +121,15 @@ def merge_datasets(existing_file, new_file, output_file):
     merged_data.to_csv(output_file, index=False)
     print(f"Merged dataset saved to {output_file}")
 
+def copy_metadata(src_folder, dest_folder):
+    """Copy the metadata file to the destination folder."""
+    metadata_file = os.path.join(src_folder, "dataset-metadata.json")
+    if os.path.exists(metadata_file):
+        shutil.copy(metadata_file, dest_folder)
+        print(f"Copied metadata file from {metadata_file} to {dest_folder}")
+    else:
+        print(f"Metadata file not found in {src_folder}")
+
 def upload_to_kaggle(upload_folder, dataset_slug, version_notes):
     """Upload the updated dataset to Kaggle."""
     api = KaggleApi()
@@ -138,7 +147,7 @@ def main():
     os.makedirs(NEW_DATA_FOLDER, exist_ok=True)
     os.makedirs(MERGED_FOLDER, exist_ok=True)
 
-    # Step 1: Clean folders (do not wait to clean merged_data until after successful upload)
+    # Step 1: Clean folders (do not remove metadata until after successful upload)
     clean_folder(DATA_FOLDER)
     clean_folder(NEW_DATA_FOLDER)
     clean_folder(MERGED_FOLDER)
@@ -166,8 +175,11 @@ def main():
         new_file = os.path.join(NEW_DATA_FOLDER, f"{tf_name}.csv")
         merged_file = os.path.join(MERGED_FOLDER, f"btc_{tf_name}_data_2018_to_2025.csv")
         merge_datasets(old_file, new_file, merged_file)
+    
+    # Copy metadata file from DATA_FOLDER to MERGED_FOLDER so that Kaggle API finds it
+    copy_metadata(DATA_FOLDER, MERGED_FOLDER)
 
-    # Step 5: Upload updated datasets from MERGED_FOLDER with retry loop until all files upload
+    # Step 5: Upload updated datasets from MERGED_FOLDER with a retry loop until successful
     current_date = datetime.now().strftime("%B, %d %Y")
     upload_successful = False
     while not upload_successful:
