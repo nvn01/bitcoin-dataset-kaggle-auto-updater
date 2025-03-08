@@ -1,4 +1,7 @@
 import os
+# Disable resumable uploads in Kaggle API (helps in CI environments like GitHub Actions)
+os.environ["KAGGLE_API_NO_RESUME"] = "True"
+
 import sys
 import time
 import shutil
