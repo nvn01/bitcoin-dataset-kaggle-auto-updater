@@ -94,8 +94,14 @@ def fetch_binance_data(symbol, interval, start_date, end_date, output_file, max_
                 'Taker buy base asset volume', 'Taker buy quote asset volume', 'Ignore'
             ]
             df = pd.DataFrame(klines, columns=columns)
-            df['Open time'] = pd.to_datetime(df['Open time'], unit='ms')
-            df['Close time'] = pd.to_datetime(df['Close time'], unit='ms')
+            # Convert timestamps to UTC datetime explicitly
+            df['Open time'] = pd.to_datetime(df['Open time'], unit='ms', utc=True)
+            df['Close time'] = pd.to_datetime(df['Close time'], unit='ms', utc=True)
+            
+            # Convert to string format with explicit UTC designation for clarity
+            df['Open time'] = df['Open time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]  # Remove last 3 digits for milliseconds
+            df['Close time'] = df['Close time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
+            
             df.to_csv(output_file, index=False)
             print(f"Fetched data saved to {output_file}")
             return
@@ -114,15 +120,56 @@ def merge_datasets(existing_file, new_file, output_file):
     existing_data = pd.read_csv(existing_file)
     new_data = pd.read_csv(new_file)
 
-    # Ensure Open time is datetime
-    existing_data['Open time'] = pd.to_datetime(existing_data['Open time'])
-    new_data['Open time'] = pd.to_datetime(new_data['Open time'])
+    # Safety check: ensure both datasets have consistent timestamp formats
+    existing_sample = str(existing_data['Open time'].iloc[0])
+    new_sample = str(new_data['Open time'].iloc[0])
+    
+    print(f"Existing data timestamp format: {existing_sample}")
+    print(f"New data timestamp format: {new_sample}")
+
+    # Handle timezone-aware datetime parsing
+    # For existing data (which might be in old format without explicit UTC)
+    if 'UTC' in existing_sample:
+        print("Existing data has explicit UTC format")
+        existing_data['Open time'] = pd.to_datetime(existing_data['Open time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+        existing_data['Close time'] = pd.to_datetime(existing_data['Close time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+    else:
+        print("Existing data missing explicit UTC format - assuming UTC")
+        # Assume existing data is in UTC but not explicitly marked
+        existing_data['Open time'] = pd.to_datetime(existing_data['Open time'], utc=True)
+        existing_data['Close time'] = pd.to_datetime(existing_data['Close time'], utc=True)
+    
+    # For new data (should have explicit UTC format)
+    if 'UTC' in new_sample:
+        print("New data has explicit UTC format")
+        new_data['Open time'] = pd.to_datetime(new_data['Open time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+        new_data['Close time'] = pd.to_datetime(new_data['Close time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+    else:
+        print("New data missing explicit UTC format - assuming UTC")
+        new_data['Open time'] = pd.to_datetime(new_data['Open time'], utc=True)
+        new_data['Close time'] = pd.to_datetime(new_data['Close time'], utc=True)
+
+    # Check for potential data overlap
+    existing_max_time = existing_data['Open time'].max()
+    new_min_time = new_data['Open time'].min()
+    print(f"Existing data ends at: {existing_max_time}")
+    print(f"New data starts at: {new_min_time}")
 
     merged_data = pd.concat([existing_data, new_data])
+    duplicates_before = len(merged_data)
     merged_data.drop_duplicates(subset='Open time', inplace=True)
+    duplicates_removed = duplicates_before - len(merged_data)
+    print(f"Removed {duplicates_removed} duplicate records")
+    
     merged_data.sort_values(by='Open time', inplace=True)
+    
+    # Convert back to string format with UTC designation for output
+    merged_data['Open time'] = merged_data['Open time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
+    merged_data['Close time'] = merged_data['Close time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
+    
     merged_data.to_csv(output_file, index=False)
     print(f"Merged dataset saved to {output_file}")
+    print(f"Final dataset contains {len(merged_data)} records")
 
 def copy_metadata(src_folder, dest_folder):
     """Copy the metadata file to the destination folder."""

@@ -16,17 +16,23 @@ The script maintains four CSV files with different timeframes:
 
 Each file contains the following columns:
 
-- Open time
+- Open time _(UTC timezone)_
 - Open
 - High
 - Low
 - Close
 - Volume
-- Close time
+- Close time _(UTC timezone)_
 - Quote asset volume
 - Number of trades
 - Taker buy base asset volume
 - Taker buy quote asset volume
+
+### Important Note about Timestamps
+
+**All timestamps in the dataset are in UTC (Coordinated Universal Time).** This includes both "Open time" and "Close time" columns. Starting from the latest updates, timestamps are explicitly formatted with "UTC" designation (e.g., "2025-01-01 00:00:00.000 UTC") to eliminate any timezone confusion.
+
+The data is sourced directly from Binance API, which provides timestamps in UTC milliseconds since epoch. This ensures consistency with the original Binance data format.
 
 ## License
 
