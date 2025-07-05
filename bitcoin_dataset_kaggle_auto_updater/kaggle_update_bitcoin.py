@@ -98,9 +98,17 @@ def fetch_binance_data(symbol, interval, start_date, end_date, output_file, max_
             df['Open time'] = pd.to_datetime(df['Open time'], unit='ms', utc=True)
             df['Close time'] = pd.to_datetime(df['Close time'], unit='ms', utc=True)
             
-            # Convert to string format with explicit UTC designation for clarity
-            df['Open time'] = df['Open time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]  # Remove last 3 digits for milliseconds
-            df['Close time'] = df['Close time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
+            # Handle daily timeframe formatting specifically
+            if interval == Client.KLINE_INTERVAL_1DAY:
+                # For daily data: Open time = 00:00:00.000000, Close time = 23:59:59.999000
+                df['Open time'] = df['Open time'].dt.strftime('%Y-%m-%d') + ' 00:00:00.000000 UTC'
+                df['Close time'] = df['Close time'].dt.strftime('%Y-%m-%d') + ' 23:59:59.999000 UTC'
+                print(f"Applied daily timeframe formatting for {len(df)} records")
+            else:
+                # For other timeframes: use actual timestamps
+                df['Open time'] = df['Open time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]  # Remove last 3 digits for milliseconds
+                df['Close time'] = df['Close time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
+                print(f"Applied standard timeframe formatting for {len(df)} records")
             
             df.to_csv(output_file, index=False)
             print(f"Fetched data saved to {output_file}")
@@ -127,12 +135,17 @@ def merge_datasets(existing_file, new_file, output_file):
     print(f"Existing data timestamp format: {existing_sample}")
     print(f"New data timestamp format: {new_sample}")
 
-    # Handle timezone-aware datetime parsing
+    # Handle timezone-aware datetime parsing with improved format detection
     # For existing data (which might be in old format without explicit UTC)
     if 'UTC' in existing_sample:
         print("Existing data has explicit UTC format")
-        existing_data['Open time'] = pd.to_datetime(existing_data['Open time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
-        existing_data['Close time'] = pd.to_datetime(existing_data['Close time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+        try:
+            existing_data['Open time'] = pd.to_datetime(existing_data['Open time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+            existing_data['Close time'] = pd.to_datetime(existing_data['Close time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+        except ValueError:
+            # Handle case where existing data might not have microseconds
+            existing_data['Open time'] = pd.to_datetime(existing_data['Open time'], utc=True)
+            existing_data['Close time'] = pd.to_datetime(existing_data['Close time'], utc=True)
     else:
         print("Existing data missing explicit UTC format - assuming UTC")
         # Assume existing data is in UTC but not explicitly marked
@@ -142,8 +155,13 @@ def merge_datasets(existing_file, new_file, output_file):
     # For new data (should have explicit UTC format)
     if 'UTC' in new_sample:
         print("New data has explicit UTC format")
-        new_data['Open time'] = pd.to_datetime(new_data['Open time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
-        new_data['Close time'] = pd.to_datetime(new_data['Close time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+        try:
+            new_data['Open time'] = pd.to_datetime(new_data['Open time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+            new_data['Close time'] = pd.to_datetime(new_data['Close time'], format='%Y-%m-%d %H:%M:%S.%f UTC', utc=True)
+        except ValueError:
+            # Handle case where new data might not have microseconds
+            new_data['Open time'] = pd.to_datetime(new_data['Open time'], utc=True)
+            new_data['Close time'] = pd.to_datetime(new_data['Close time'], utc=True)
     else:
         print("New data missing explicit UTC format - assuming UTC")
         new_data['Open time'] = pd.to_datetime(new_data['Open time'], utc=True)
@@ -164,8 +182,19 @@ def merge_datasets(existing_file, new_file, output_file):
     merged_data.sort_values(by='Open time', inplace=True)
     
     # Convert back to string format with UTC designation for output
-    merged_data['Open time'] = merged_data['Open time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
-    merged_data['Close time'] = merged_data['Close time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
+    # Check if this is daily data by looking at the filename
+    is_daily_data = '1d' in output_file or 'daily' in output_file.lower()
+    
+    if is_daily_data:
+        # For daily data: standardize to 00:00:00.000000 and 23:59:59.999000
+        merged_data['Open time'] = merged_data['Open time'].dt.strftime('%Y-%m-%d') + ' 00:00:00.000000 UTC'
+        merged_data['Close time'] = merged_data['Close time'].dt.strftime('%Y-%m-%d') + ' 23:59:59.999000 UTC'
+        print("Applied daily timeframe formatting to merged data")
+    else:
+        # For other timeframes: use actual timestamps
+        merged_data['Open time'] = merged_data['Open time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
+        merged_data['Close time'] = merged_data['Close time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
+        print("Applied standard timeframe formatting to merged data")
     
     merged_data.to_csv(output_file, index=False)
     print(f"Merged dataset saved to {output_file}")
@@ -175,17 +204,19 @@ def copy_metadata(src_folder, dest_folder):
     """Copy the metadata file to the destination folder."""
     import json
     
-    # Create a simple metadata file instead of copying the complex one
+    # Create a comprehensive metadata file with timezone information
     metadata = {
-        "title": "Bitcoin Historical Datasets 2018-2024",
+        "title": "Bitcoin Historical Datasets 2018-2024 (UTC Timezone)",
         "id": "novandraanugrah/bitcoin-historical-datasets-2018-2024",
-        "licenses": [{"name": "CC BY 4.0"}]
+        "licenses": [{"name": "CC BY 4.0"}],
+        "subtitle": "Historical Bitcoin price data from Binance with consistent UTC timestamps",
+        "description": "This dataset contains historical Bitcoin (BTC/USDT) price data from Binance exchange with the following specifications:\n\n**Timezone Information:**\n- All timestamps are in UTC (Coordinated Universal Time)\n- Open time format: YYYY-MM-DD HH:MM:SS.ffffff UTC\n- Close time format: YYYY-MM-DD HH:MM:SS.ffffff UTC\n\n**Daily Timeframe Specific:**\n- Open time: Always shows 00:00:00.000000 UTC (start of day)\n- Close time: Always shows 23:59:59.999000 UTC (end of day)\n\n**Timeframes Available:**\n- 15-minute intervals (15m)\n- 1-hour intervals (1h) \n- 4-hour intervals (4h)\n- 1-day intervals (1d)\n\n**Data Columns:**\n- Open time: Opening timestamp in UTC\n- Open: Opening price\n- High: Highest price during period\n- Low: Lowest price during period\n- Close: Closing price\n- Volume: Trading volume\n- Close time: Closing timestamp in UTC\n- Quote asset volume: Volume in quote asset (USDT)\n- Number of trades: Number of trades during period\n- Taker buy base asset volume: Volume of taker buy orders\n- Taker buy quote asset volume: Volume of taker buy orders in quote asset\n- Ignore: Unused field\n\nData is automatically updated and maintained through automated scripts."
     }
     
     metadata_file = os.path.join(dest_folder, "dataset-metadata.json")
     with open(metadata_file, 'w') as f:
         json.dump(metadata, f, indent=2)
-    print(f"Created minimal metadata file at {metadata_file}")
+    print(f"Created comprehensive metadata file at {metadata_file}")
 
 def upload_to_kaggle(upload_folder, dataset_slug, version_notes):
     """Upload the updated dataset to Kaggle without using the proxy."""
