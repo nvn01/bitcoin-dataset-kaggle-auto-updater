@@ -126,12 +126,19 @@ def merge_datasets(existing_file, new_file, output_file):
 
 def copy_metadata(src_folder, dest_folder):
     """Copy the metadata file to the destination folder."""
-    metadata_file = os.path.join(src_folder, "dataset-metadata.json")
-    if os.path.exists(metadata_file):
-        shutil.copy(metadata_file, dest_folder)
-        print(f"Copied metadata file from {metadata_file} to {dest_folder}")
-    else:
-        print(f"Metadata file not found in {src_folder}")
+    import json
+    
+    # Create a simple metadata file instead of copying the complex one
+    metadata = {
+        "title": "Bitcoin Historical Datasets 2018-2024",
+        "id": "novandraanugrah/bitcoin-historical-datasets-2018-2024",
+        "licenses": [{"name": "CC BY 4.0"}]
+    }
+    
+    metadata_file = os.path.join(dest_folder, "dataset-metadata.json")
+    with open(metadata_file, 'w') as f:
+        json.dump(metadata, f, indent=2)
+    print(f"Created minimal metadata file at {metadata_file}")
 
 def upload_to_kaggle(upload_folder, dataset_slug, version_notes):
     """Upload the updated dataset to Kaggle without using the proxy."""
