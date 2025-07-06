@@ -124,9 +124,13 @@ def fetch_binance_data(symbol, interval, start_date, end_date, output_file, max_
                 raise
 
 def merge_datasets(existing_file, new_file, output_file):
-    """Merge existing and new datasets."""
+    """Merge existing and new datasets - optimized for large datasets."""
+    # Read datasets
     existing_data = pd.read_csv(existing_file)
     new_data = pd.read_csv(new_file)
+    
+    print(f"Existing data shape: {existing_data.shape}")
+    print(f"New data shape: {new_data.shape}")
 
     # Safety check: ensure both datasets have consistent timestamp formats
     existing_sample = str(existing_data['Open time'].iloc[0])
@@ -148,7 +152,6 @@ def merge_datasets(existing_file, new_file, output_file):
             existing_data['Close time'] = pd.to_datetime(existing_data['Close time'], utc=True)
     else:
         print("Existing data missing explicit UTC format - assuming UTC")
-        # Assume existing data is in UTC but not explicitly marked
         existing_data['Open time'] = pd.to_datetime(existing_data['Open time'], utc=True)
         existing_data['Close time'] = pd.to_datetime(existing_data['Close time'], utc=True)
     
@@ -167,19 +170,35 @@ def merge_datasets(existing_file, new_file, output_file):
         new_data['Open time'] = pd.to_datetime(new_data['Open time'], utc=True)
         new_data['Close time'] = pd.to_datetime(new_data['Close time'], utc=True)
 
-    # Check for potential data overlap
-    existing_max_time = existing_data['Open time'].max()
-    new_min_time = new_data['Open time'].min()
-    print(f"Existing data ends at: {existing_max_time}")
-    print(f"New data starts at: {new_min_time}")
-
-    merged_data = pd.concat([existing_data, new_data])
-    duplicates_before = len(merged_data)
-    merged_data.drop_duplicates(subset='Open time', inplace=True)
-    duplicates_removed = duplicates_before - len(merged_data)
-    print(f"Removed {duplicates_removed} duplicate records")
+    # OPTIMIZATION: Only keep recent existing data to reduce processing time
+    # Keep only data from the last 30 days to handle overlaps efficiently
+    cutoff_date = pd.Timestamp.now(tz='UTC') - pd.Timedelta(days=30)
+    new_data_start = new_data['Open time'].min()
     
-    merged_data.sort_values(by='Open time', inplace=True)
+    # Use the earlier of cutoff_date or new_data_start to ensure we don't miss any data
+    filter_date = min(cutoff_date, new_data_start)
+    
+    existing_before_filter = len(existing_data)
+    existing_recent = existing_data[existing_data['Open time'] >= filter_date].copy()
+    existing_old = existing_data[existing_data['Open time'] < filter_date].copy()
+    
+    print(f"Filtered existing data: keeping {len(existing_recent)} recent records, {len(existing_old)} older records")
+    
+    # Merge only the recent data with new data
+    merged_recent = pd.concat([existing_recent, new_data], ignore_index=True)
+    duplicates_before = len(merged_recent)
+    merged_recent.drop_duplicates(subset='Open time', inplace=True)
+    duplicates_removed = duplicates_before - len(merged_recent)
+    print(f"Removed {duplicates_removed} duplicate records from recent data")
+    
+    # Sort the recent merged data
+    merged_recent.sort_values(by='Open time', inplace=True)
+    
+    # Combine old data with merged recent data
+    final_data = pd.concat([existing_old, merged_recent], ignore_index=True)
+    final_data.sort_values(by='Open time', inplace=True)
+    
+    print(f"Final dataset contains {len(final_data)} records")
     
     # Convert back to string format with UTC designation for output
     # Check if this is daily data by looking at the filename
@@ -187,18 +206,18 @@ def merge_datasets(existing_file, new_file, output_file):
     
     if is_daily_data:
         # For daily data: standardize to 00:00:00.000000 and 23:59:59.999000
-        merged_data['Open time'] = merged_data['Open time'].dt.strftime('%Y-%m-%d') + ' 00:00:00.000000 UTC'
-        merged_data['Close time'] = merged_data['Close time'].dt.strftime('%Y-%m-%d') + ' 23:59:59.999000 UTC'
+        final_data['Open time'] = final_data['Open time'].dt.strftime('%Y-%m-%d') + ' 00:00:00.000000 UTC'
+        final_data['Close time'] = final_data['Close time'].dt.strftime('%Y-%m-%d') + ' 23:59:59.999000 UTC'
         print("Applied daily timeframe formatting to merged data")
     else:
         # For other timeframes: use actual timestamps
-        merged_data['Open time'] = merged_data['Open time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
-        merged_data['Close time'] = merged_data['Close time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC')[:-3]
+        final_data['Open time'] = final_data['Open time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC').str[:-3]
+        final_data['Close time'] = final_data['Close time'].dt.strftime('%Y-%m-%d %H:%M:%S.%f UTC').str[:-3]
         print("Applied standard timeframe formatting to merged data")
     
-    merged_data.to_csv(output_file, index=False)
+    final_data.to_csv(output_file, index=False)
     print(f"Merged dataset saved to {output_file}")
-    print(f"Final dataset contains {len(merged_data)} records")
+    print(f"Final dataset contains {len(final_data)} records")
 
 def copy_metadata(src_folder, dest_folder):
     """Copy the metadata file to the destination folder."""
